@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 
@@ -84,51 +85,55 @@ func OrderToJSON(order *SignedOrder, owner string, orderType OrderType) map[stri
 // OrderToJSONWithPostOnly 将订单转换为JSON格式（支持 PostOnly）
 func OrderToJSONWithPostOnly(order *SignedOrder, owner string, orderType OrderType, postOnly bool) map[string]interface{} {
 	// 将签名从 []byte 转换为 hex 字符串（带 0x 前缀）
-	var signatureHex string
-	if order.Signature != nil {
-		// 检查签名是否已经是 hex 格式的字符串（base64 编码）
-		sigStr := string(order.Signature)
-		if strings.HasPrefix(sigStr, "0x") {
-			signatureHex = sigStr
-		} else {
-			// 尝试解码 base64
-			decoded, err := base64.StdEncoding.DecodeString(sigStr)
-			if err == nil {
-				signatureHex = "0x" + hex.EncodeToString(decoded)
-			} else {
-				// 直接转换为 hex
-				signatureHex = "0x" + hex.EncodeToString(order.Signature)
-			}
-		}
-	}
-
-	// 将地址转换为 checksummed 格式
-	makerAddr := common.HexToAddress(order.Maker.Hex())
-	takerAddr := common.HexToAddress(order.Taker.Hex())
-	signerAddr := common.HexToAddress(order.Signer.Hex())
+	signatureHex := signatureToHex(order.Signature)
 
 	// 将 side 从数字转换为字符串 "BUY" 或 "SELL"
 	// Python: BUY = 0, SELL = 1
 	sideStr := "BUY"
-	if order.Side.Int64() == 1 {
+	if order.Side != nil && order.Side.Int64() == 1 {
 		sideStr = "SELL"
+	}
+
+	if order.Version == 2 {
+		orderDict := map[string]interface{}{
+			"salt":          bigIntInt64(order.Salt), // CLOB v2 requires a JSON number
+			"maker":         common.HexToAddress(order.Maker.Hex()).Hex(),
+			"signer":        common.HexToAddress(order.Signer.Hex()).Hex(),
+			"tokenId":       bigIntString(order.TokenId),
+			"makerAmount":   bigIntString(order.MakerAmount),
+			"takerAmount":   bigIntString(order.TakerAmount),
+			"side":          sideStr,
+			"signatureType": int(bigIntInt64(order.SignatureType)),
+			"timestamp":     bigIntString(order.Timestamp),
+			"expiration":    bigIntString(order.Expiration),
+			"metadata":      order.Metadata,
+			"builder":       order.Builder,
+			"signature":     signatureHex,
+		}
+		return map[string]interface{}{
+			"order":     orderDict,
+			"owner":     owner,
+			"orderType": string(orderType),
+			"postOnly":  postOnly,
+			"deferExec": false,
+		}
 	}
 
 	// 将SignedOrder转换为字典
 	// 格式与 Python py_order_utils.SignedOrder.dict() 完全一致
 	orderDict := map[string]interface{}{
-		"salt":          order.Salt.Int64(),      // 整数，不是字符串
-		"maker":         makerAddr.Hex(),
-		"signer":        signerAddr.Hex(),
-		"taker":         takerAddr.Hex(),
-		"tokenId":       order.TokenId.String(),
-		"makerAmount":   order.MakerAmount.String(),
-		"takerAmount":   order.TakerAmount.String(),
-		"expiration":    order.Expiration.String(),
-		"nonce":         order.Nonce.String(),
-		"feeRateBps":    order.FeeRateBps.String(),
-		"side":          sideStr,                          // 字符串 "BUY" 或 "SELL"
-		"signatureType": int(order.SignatureType.Int64()), // 整数
+		"salt":          bigIntInt64(order.Salt), // 整数，不是字符串
+		"maker":         common.HexToAddress(order.Maker.Hex()).Hex(),
+		"signer":        common.HexToAddress(order.Signer.Hex()).Hex(),
+		"taker":         common.HexToAddress(order.Taker.Hex()).Hex(),
+		"tokenId":       bigIntString(order.TokenId),
+		"makerAmount":   bigIntString(order.MakerAmount),
+		"takerAmount":   bigIntString(order.TakerAmount),
+		"expiration":    bigIntString(order.Expiration),
+		"nonce":         bigIntString(order.Nonce),
+		"feeRateBps":    bigIntString(order.FeeRateBps),
+		"side":          sideStr,                               // 字符串 "BUY" 或 "SELL"
+		"signatureType": int(bigIntInt64(order.SignatureType)), // 整数
 		"signature":     signatureHex,
 	}
 	return map[string]interface{}{
@@ -136,7 +141,40 @@ func OrderToJSONWithPostOnly(order *SignedOrder, owner string, orderType OrderTy
 		"owner":     owner,
 		"orderType": string(orderType),
 		"postOnly":  postOnly,
+		"deferExec": false,
 	}
+}
+
+func signatureToHex(signature []byte) string {
+	if signature == nil {
+		return ""
+	}
+
+	sigStr := string(signature)
+	if strings.HasPrefix(sigStr, "0x") {
+		return sigStr
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(sigStr)
+	if err == nil {
+		return "0x" + hex.EncodeToString(decoded)
+	}
+
+	return "0x" + hex.EncodeToString(signature)
+}
+
+func bigIntString(v *big.Int) string {
+	if v == nil {
+		return "0"
+	}
+	return v.String()
+}
+
+func bigIntInt64(v *big.Int) int64 {
+	if v == nil {
+		return 0
+	}
+	return v.Int64()
 }
 
 // IsTickSizeSmaller 检查tick size是否更小
@@ -168,4 +206,3 @@ func getBool(m map[string]interface{}, key string) bool {
 	}
 	return false
 }
-

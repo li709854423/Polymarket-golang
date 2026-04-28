@@ -1,13 +1,11 @@
 package polymarket
 
-import (
-	"github.com/polymarket/go-order-utils/pkg/model"
-)
+import obuilder "github.com/wimgithub/Polymarket-golang/polymarket/order_builder"
 
 // ApiCreds API凭证
 type ApiCreds struct {
-	APIKey     string `json:"apiKey"`
-	APISecret  string `json:"secret"`
+	APIKey        string `json:"apiKey"`
+	APISecret     string `json:"secret"`
 	APIPassphrase string `json:"passphrase"`
 }
 
@@ -18,9 +16,9 @@ type ReadonlyApiKeyResponse struct {
 
 // RequestArgs 请求参数
 type RequestArgs struct {
-	Method        string
-	RequestPath   string
-	Body          interface{}
+	Method         string
+	RequestPath    string
+	Body           interface{}
 	SerializedBody *string
 }
 
@@ -32,26 +30,30 @@ type BookParams struct {
 
 // OrderArgs 限价订单参数
 type OrderArgs struct {
-	TokenID     string  `json:"token_id"`      // 条件代币资产ID
+	TokenID     string  `json:"token_id"`     // 条件代币资产ID
 	Price       float64 `json:"price"`        // 订单价格
 	Size        float64 `json:"size"`         // 条件代币数量
 	Side        string  `json:"side"`         // BUY 或 SELL
 	FeeRateBps  int     `json:"fee_rate_bps"` // 手续费率（基点）
 	Nonce       int     `json:"nonce"`        // 用于链上取消的nonce
-	Expiration  int     `json:"expiration"`    // 订单过期时间戳
-	Taker       string  `json:"taker"`         // 订单接受者地址，零地址表示公开订单
+	Expiration  int     `json:"expiration"`   // 订单过期时间戳
+	Taker       string  `json:"taker"`        // 订单接受者地址，零地址表示公开订单
+	Metadata    string  `json:"metadata"`     // CLOB v2 metadata bytes32
+	BuilderCode string  `json:"builder_code"` // CLOB v2 builder code bytes32
 }
 
 // MarketOrderArgs 市价订单参数
 type MarketOrderArgs struct {
-	TokenID     string    `json:"token_id"`      // 条件代币资产ID
+	TokenID     string    `json:"token_id"`     // 条件代币资产ID
 	Amount      float64   `json:"amount"`       // BUY: 美元金额, SELL: 份额数量
-	Side        string    `json:"side"`          // BUY 或 SELL
+	Side        string    `json:"side"`         // BUY 或 SELL
 	Price       float64   `json:"price"`        // 订单价格（可选）
 	FeeRateBps  int       `json:"fee_rate_bps"` // 手续费率（基点）
 	Nonce       int       `json:"nonce"`        // 用于链上取消的nonce
-	Taker       string    `json:"taker"`         // 订单接受者地址
+	Taker       string    `json:"taker"`        // 订单接受者地址
 	OrderType   OrderType `json:"order_type"`   // 订单类型
+	Metadata    string    `json:"metadata"`     // CLOB v2 metadata bytes32
+	BuilderCode string    `json:"builder_code"` // CLOB v2 builder code bytes32
 }
 
 // TradeParams 交易查询参数
@@ -84,15 +86,15 @@ type OrderSummary struct {
 
 // OrderBookSummary 订单簿摘要
 type OrderBookSummary struct {
-	Market        string         `json:"market"`
-	AssetID       string         `json:"asset_id"`
-	Timestamp     string         `json:"timestamp"`
-	Bids          []OrderSummary `json:"bids"`
-	Asks          []OrderSummary `json:"asks"`
-	MinOrderSize  string         `json:"min_order_size"`
-	NegRisk       bool           `json:"neg_risk"`
-	TickSize      string         `json:"tick_size"`
-	Hash          string         `json:"hash"`
+	Market       string         `json:"market"`
+	AssetID      string         `json:"asset_id"`
+	Timestamp    string         `json:"timestamp"`
+	Bids         []OrderSummary `json:"bids"`
+	Asks         []OrderSummary `json:"asks"`
+	MinOrderSize string         `json:"min_order_size"`
+	NegRisk      bool           `json:"neg_risk"`
+	TickSize     string         `json:"tick_size"`
+	Hash         string         `json:"hash"`
 }
 
 // AssetType 资产类型
@@ -149,20 +151,21 @@ type RoundConfig struct {
 
 // ContractConfig 合约配置
 type ContractConfig struct {
-	Exchange         string `json:"exchange"`          // 交易所合约地址
-	Collateral       string `json:"collateral"`         // 抵押品代币地址
+	Exchange          string `json:"exchange"`           // 交易所合约地址
+	ExchangeV2        string `json:"exchange_v2"`        // CLOB v2 交易所合约地址
+	Collateral        string `json:"collateral"`         // 抵押品代币地址
 	ConditionalTokens string `json:"conditional_tokens"` // 条件代币合约地址
 }
 
 // PostOrdersArgs 批量下单参数
 type PostOrdersArgs struct {
-	Order     *model.SignedOrder `json:"order"`
-	OrderType OrderType          `json:"orderType"`
-	PostOnly  bool               `json:"postOnly,omitempty"`
+	Order     *SignedOrder `json:"order"`
+	OrderType OrderType    `json:"orderType"`
+	PostOnly  bool         `json:"postOnly,omitempty"`
 }
 
-// SignedOrder 已签名的订单（包装go-order-utils的SignedOrder）
-type SignedOrder = model.SignedOrder
+// SignedOrder 已签名的订单
+type SignedOrder = obuilder.SignedOrder
 
 // PostOrderResult 提交订单的结果，包含原始请求和响应
 type PostOrderResult struct {
@@ -175,4 +178,3 @@ type PostOrdersResult struct {
 	Payload  []map[string]interface{} `json:"payload"`  // 原始 POST 请求体
 	Response interface{}              `json:"response"` // API 响应
 }
-

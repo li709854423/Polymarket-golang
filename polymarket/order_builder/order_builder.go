@@ -15,6 +15,7 @@ type Signer interface {
 	Address() string
 	GetChainID() int
 	GetPrivateKey() string
+	Sign(messageHash []byte) (string, error)
 }
 
 // OrderBuilder 订单构建器
@@ -235,7 +236,7 @@ func (ob *OrderBuilder) CalculateSellMarketPrice(positions []interface{}, amount
 }
 
 // BuildSignedOrder 构建已签名订单（导出方法，供主包使用）
-func (ob *OrderBuilder) BuildSignedOrder(orderData *model.OrderData, exchangeAddr string, chainID int, negRisk bool) (*model.SignedOrder, error) {
+func (ob *OrderBuilder) BuildSignedOrder(orderData *model.OrderData, exchangeAddr string, chainID int, negRisk bool) (*SignedOrder, error) {
 	// 解析私钥
 	privateKeyHex := ob.signer.GetPrivateKey()
 	// 移除0x前缀（如果有）
@@ -266,7 +267,7 @@ func (ob *OrderBuilder) BuildSignedOrder(orderData *model.OrderData, exchangeAdd
 		return nil, fmt.Errorf("failed to build signed order: %w", err)
 	}
 
-	return signedOrder, nil
+	return signedOrderFromV1(signedOrder), nil
 }
 
 // GetSigType 获取签名类型

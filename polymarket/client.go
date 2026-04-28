@@ -6,7 +6,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/common"
 	obuilder "github.com/wimgithub/Polymarket-golang/polymarket/order_builder"
 	"github.com/wimgithub/Polymarket-golang/polymarket/rfq"
 )
@@ -41,8 +40,8 @@ type ClobClient struct {
 // chainID: 链ID（137 for Polygon, 80002 for Amoy）
 // privateKey: 私钥（十六进制字符串，可选）
 // creds: API凭证（可选）
-// signatureType: 签名类型（0=EOA, 1=Email/Magic, 2=Browser proxy，可选）
-// funder: 资金持有者地址（用于代理钱包，可选）
+// signatureType: 签名类型（0=EOA, 1=Polymarket Proxy, 2=Gnosis Safe, 3=EIP-1271，可选）
+// funder: maker/funder 地址（用于 Polymarket proxy、Gnosis Safe 或 1271 钱包，可选）
 func NewClobClient(host string, chainID int, privateKey string, creds *ApiCreds, signatureType *int, funder string) (*ClobClient, error) {
 	// 移除host末尾的斜杠
 	if strings.HasSuffix(host, "/") {
@@ -131,8 +130,17 @@ func (c *ClobClient) GetConditionalAddress() string {
 	return ""
 }
 
-// GetExchangeAddress 返回交易所地址
+// GetExchangeAddress 返回 CLOB v2 交易所地址
 func (c *ClobClient) GetExchangeAddress(negRisk bool) string {
+	config := getContractConfig(c.chainID, negRisk)
+	if config != nil {
+		return config.ExchangeV2
+	}
+	return ""
+}
+
+// GetExchangeV1Address 返回旧版 CLOB v1 交易所地址
+func (c *ClobClient) GetExchangeV1Address(negRisk bool) string {
 	config := getContractConfig(c.chainID, negRisk)
 	if config != nil {
 		return config.Exchange
@@ -258,6 +266,6 @@ func (c *ClobClient) CreateOrderForRFQ(args *rfq.OrderCreationArgs) (*rfq.Signed
 		FeeRateBps:    signedOrder.FeeRateBps.String(),
 		Side:          sideStr,
 		SignatureType: int(signedOrder.SignatureType.Int64()),
-		Signature:     "0x" + common.Bytes2Hex(signedOrder.Signature),
+		Signature:     signatureToHex(signedOrder.Signature),
 	}, nil
 }
