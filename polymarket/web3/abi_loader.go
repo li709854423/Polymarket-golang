@@ -18,6 +18,7 @@ var (
 	CTFExchangeABI       abi.ABI
 	NegRiskExchangeABI   abi.ABI
 	NegRiskAdapterABI    abi.ABI
+	CollateralOnrampABI  abi.ABI
 	ProxyFactoryABI      abi.ABI
 	SafeProxyFactoryABI  abi.ABI
 	SafeABI              abi.ABI
@@ -49,6 +50,11 @@ func init() {
 	NegRiskAdapterABI, err = loadABI("NegRiskAdapter")
 	if err != nil {
 		panic("failed to load NegRiskAdapter ABI: " + err.Error())
+	}
+
+	CollateralOnrampABI, err = loadABI("CollateralOnramp")
+	if err != nil {
+		panic("failed to load CollateralOnramp ABI: " + err.Error())
 	}
 
 	ProxyFactoryABI, err = loadABI("ProxyWalletFactory")
@@ -86,4 +92,3 @@ func loadABI(contractName string) (abi.ABI, error) {
 
 	return abi.JSON(strings.NewReader(string(abiBytes)))
 }
-

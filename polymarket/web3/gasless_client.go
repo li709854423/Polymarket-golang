@@ -515,13 +515,92 @@ func (c *PolymarketGaslessWeb3Client) RedeemPosition(conditionID common.Hash, am
 		data, err = NegRiskAdapterABI.Pack("redeemPositions", conditionID, intAmounts)
 	} else {
 		to = c.ConditionalTokensAddress
-		data, err = ConditionalTokensABI.Pack("redeemPositions", c.USDCAddress, HashZero, conditionID, []*big.Int{big.NewInt(1), big.NewInt(2)})
+		data, err = c.encodeRedeem(conditionID)
 	}
 	if err != nil {
 		return nil, err
 	}
 
 	return c.Execute(to, data, "Redeem Position", "redeem")
+}
+
+// ActivateFunds 将 Polygon USDC.e 包装为 pUSD，以便继续参与 v2 市场。
+func (c *PolymarketGaslessWeb3Client) ActivateFunds(amount float64) ([]*TransactionReceipt, error) {
+	if c.chainID != 137 {
+		return nil, fmt.Errorf("ActivateFunds only supports Polygon mainnet")
+	}
+	if amount <= 0 {
+		return nil, fmt.Errorf("amount must be greater than 0")
+	}
+
+	amountInt := ToWei(amount, 6)
+	balance, err := c.getERC20BalanceRaw(USDCeAddress, c.Address)
+	if err != nil {
+		return nil, err
+	}
+	if balance.Cmp(amountInt) < 0 {
+		balanceFloat := tokenAmountToFloat(balance, 6)
+		balanceValue, _ := balanceFloat.Float64()
+		return nil, fmt.Errorf("insufficient USDC.e balance: %f < %f", balanceValue, amount)
+	}
+
+	allowance, err := c.getERC20AllowanceRaw(USDCeAddress, c.Address, CollateralOnrampAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	receipts := make([]*TransactionReceipt, 0, 2)
+	needsApproval := allowance.Cmp(amountInt) < 0
+	if needsApproval && c.signatureType == SignatureTypePolyProxy {
+		approveData, err := c.encodeERC20Approve(CollateralOnrampAddress, MaxUint256())
+		if err != nil {
+			return receipts, err
+		}
+		wrapData, err := c.encodeCollateralOnrampWrap(USDCeAddress, c.Address, amountInt)
+		if err != nil {
+			return receipts, err
+		}
+		r, err := c.ExecuteBatch([]ProxyCall{
+			{TypeCode: 1, To: USDCeAddress, Value: big.NewInt(0), Data: approveData},
+			{TypeCode: 1, To: CollateralOnrampAddress, Value: big.NewInt(0), Data: wrapData},
+		}, "Activate Funds", "activate-funds")
+		if err != nil {
+			return receipts, err
+		}
+		if r.Status != 1 {
+			return append(receipts, r), fmt.Errorf("ActivateFunds failed")
+		}
+		return append(receipts, r), nil
+	}
+
+	if needsApproval {
+		data, err := c.encodeERC20Approve(CollateralOnrampAddress, MaxUint256())
+		if err != nil {
+			return receipts, err
+		}
+		r, err := c.Execute(USDCeAddress, data, "USDC.e Onramp Approval", "activate-funds-approve")
+		if err != nil {
+			return receipts, err
+		}
+		receipts = append(receipts, r)
+		if r.Status != 1 {
+			return receipts, fmt.Errorf("USDC.e onramp approval failed")
+		}
+	}
+
+	data, err := c.encodeCollateralOnrampWrap(USDCeAddress, c.Address, amountInt)
+	if err != nil {
+		return receipts, err
+	}
+	r, err := c.Execute(CollateralOnrampAddress, data, "Activate Funds", "activate-funds")
+	if err != nil {
+		return receipts, err
+	}
+	receipts = append(receipts, r)
+	if r.Status != 1 {
+		return receipts, fmt.Errorf("ActivateFunds failed")
+	}
+	return receipts, nil
 }
 
 // ConvertPositions 转换NegRisk No头寸为Yes头寸和USDC
@@ -570,7 +649,7 @@ func (c *PolymarketGaslessWeb3Client) RedeemPositions(requests []RedeemRequest) 
 			data, err = NegRiskAdapterABI.Pack("redeemPositions", req.ConditionID, intAmounts)
 		} else {
 			to = c.ConditionalTokensAddress
-			data, err = ConditionalTokensABI.Pack("redeemPositions", c.USDCAddress, HashZero, req.ConditionID, []*big.Int{big.NewInt(1), big.NewInt(2)})
+			data, err = c.encodeRedeem(req.ConditionID)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("failed to encode redeem for condition %s: %w", req.ConditionID.Hex(), err)

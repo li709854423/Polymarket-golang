@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -136,12 +137,32 @@ func Keccak256Hash(data []byte) string {
 
 // ToWei 将金额转换为wei（指定小数位数）
 func ToWei(amount float64, decimals int) *big.Int {
-	multiplier := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil)
-	amountBig := new(big.Float).SetFloat64(amount)
-	amountBig.Mul(amountBig, new(big.Float).SetInt(multiplier))
+	if amount == 0 {
+		return big.NewInt(0)
+	}
+
+	amountStr := strconv.FormatFloat(amount, 'f', decimals, 64)
+	negative := strings.HasPrefix(amountStr, "-")
+	amountStr = strings.TrimPrefix(amountStr, "-")
+
+	parts := strings.SplitN(amountStr, ".", 2)
+	whole := parts[0]
+	fraction := ""
+	if len(parts) == 2 {
+		fraction = parts[1]
+	}
+	if len(fraction) < decimals {
+		fraction += strings.Repeat("0", decimals-len(fraction))
+	}
+	if len(fraction) > decimals {
+		fraction = fraction[:decimals]
+	}
 
 	result := new(big.Int)
-	amountBig.Int(result)
+	result.SetString(whole+fraction, 10)
+	if negative {
+		result.Neg(result)
+	}
 	return result
 }
 

@@ -23,6 +23,9 @@ var (
 	NegRiskAdapterAddress   = common.HexToAddress("0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296")
 	ProxyFactoryAddress     = common.HexToAddress("0xaB45c5A4B0c941a2F231C04C3f49182e1A254052")
 	SafeProxyFactoryAddress = common.HexToAddress("0xaacFeEa03eb1561C4e67d661e40682Bd20E3541b")
+	PUSDAddress             = common.HexToAddress("0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB")
+	USDCeAddress            = common.HexToAddress("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174")
+	CollateralOnrampAddress = common.HexToAddress("0x93070a847efEf7F70739046A929D47a521F5B8ee")
 
 	// 默认 RPC 端点
 	DefaultPolygonRPC = "https://polygon-rpc.com"
@@ -42,7 +45,7 @@ var chainConfigs = map[int64]*ChainConfig{
 	137: { // Polygon 主网
 		ChainID:           137,
 		Exchange:          common.HexToAddress("0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E"),
-		Collateral:        common.HexToAddress("0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB"),
+		Collateral:        PUSDAddress,
 		ConditionalTokens: common.HexToAddress("0x4D97DCd97eC945f40cF65F87097ACe5EA0476045"),
 		NegRiskExchange:   common.HexToAddress("0xC5d563A36AE78145C45a50134d48A1215220f80a"),
 	},
@@ -253,6 +256,29 @@ func (c *BaseWeb3Client) GetUSDCBalance(address common.Address) (*big.Float, err
 		address = c.Address
 	}
 
+	balance, err := c.getERC20BalanceRaw(c.USDCAddress, address)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokenAmountToFloat(balance, 6), nil
+}
+
+// GetUSDCeBalance 获取 Polygon USDC.e 余额
+func (c *BaseWeb3Client) GetUSDCeBalance(address common.Address) (*big.Float, error) {
+	if address == (common.Address{}) {
+		address = c.Address
+	}
+
+	balance, err := c.getERC20BalanceRaw(USDCeAddress, address)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokenAmountToFloat(balance, 6), nil
+}
+
+func (c *BaseWeb3Client) getERC20BalanceRaw(token common.Address, address common.Address) (*big.Int, error) {
 	// 调用 USDC 合约的 balanceOf 方法
 	data, err := USDCABI.Pack("balanceOf", address)
 	if err != nil {
@@ -260,7 +286,7 @@ func (c *BaseWeb3Client) GetUSDCBalance(address common.Address) (*big.Float, err
 	}
 
 	msg := ethereum.CallMsg{
-		To:   &c.USDCAddress,
+		To:   &token,
 		Data: data,
 	}
 
@@ -275,12 +301,40 @@ func (c *BaseWeb3Client) GetUSDCBalance(address common.Address) (*big.Float, err
 		return nil, fmt.Errorf("failed to unpack result: %w", err)
 	}
 
-	// 转换为 USDC（6 位小数）
-	balanceFloat := new(big.Float).SetInt(balance)
-	divisor := new(big.Float).SetInt(big.NewInt(1e6))
-	resultFloat := new(big.Float).Quo(balanceFloat, divisor)
+	return balance, nil
+}
 
-	return resultFloat, nil
+func (c *BaseWeb3Client) getERC20AllowanceRaw(token common.Address, owner common.Address, spender common.Address) (*big.Int, error) {
+	data, err := USDCABI.Pack("allowance", owner, spender)
+	if err != nil {
+		return nil, fmt.Errorf("failed to pack allowance call data: %w", err)
+	}
+
+	msg := ethereum.CallMsg{
+		To:   &token,
+		Data: data,
+	}
+
+	result, err := c.client.CallContract(context.Background(), msg, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call allowance: %w", err)
+	}
+
+	var allowance *big.Int
+	if err := USDCABI.UnpackIntoInterface(&allowance, "allowance", result); err != nil {
+		return nil, fmt.Errorf("failed to unpack allowance: %w", err)
+	}
+
+	return allowance, nil
+}
+
+func tokenAmountToFloat(amount *big.Int, decimals int64) *big.Float {
+	// 转换为 USDC（6 位小数）
+	amountFloat := new(big.Float).SetInt(amount)
+	divisor := new(big.Float).SetInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(decimals), nil))
+	resultFloat := new(big.Float).Quo(amountFloat, divisor)
+
+	return resultFloat
 }
 
 // GetTokenBalance 获取条件代币余额
@@ -404,6 +458,10 @@ func (c *BaseWeb3Client) encodeUSDCApprove(spender common.Address) ([]byte, erro
 	return USDCABI.Pack("approve", spender, MaxUint256())
 }
 
+func (c *BaseWeb3Client) encodeERC20Approve(spender common.Address, amount *big.Int) ([]byte, error) {
+	return USDCABI.Pack("approve", spender, amount)
+}
+
 // encodeConditionalTokensApprove 编码条件代币授权交易
 func (c *BaseWeb3Client) encodeConditionalTokensApprove(spender common.Address) ([]byte, error) {
 	return ConditionalTokensABI.Pack("setApprovalForAll", spender, true)
@@ -433,7 +491,11 @@ func (c *BaseWeb3Client) encodeMerge(conditionID common.Hash, amount *big.Int) (
 
 // encodeRedeem 编码赎回仓位交易
 func (c *BaseWeb3Client) encodeRedeem(conditionID common.Hash) ([]byte, error) {
-	return ConditionalTokensABI.Pack("redeemPositions", c.USDCAddress, HashZero, conditionID, []*big.Int{big.NewInt(1), big.NewInt(2)})
+	return c.encodeRedeemWithCollateral(c.redeemCollateralAddress(), conditionID)
+}
+
+func (c *BaseWeb3Client) encodeRedeemWithCollateral(collateral common.Address, conditionID common.Hash) ([]byte, error) {
+	return ConditionalTokensABI.Pack("redeemPositions", collateral, HashZero, conditionID, []*big.Int{big.NewInt(1), big.NewInt(2)})
 }
 
 // encodeRedeemNegRisk 编码 neg risk 赎回仓位交易
@@ -444,6 +506,17 @@ func (c *BaseWeb3Client) encodeRedeemNegRisk(conditionID common.Hash, amounts []
 // encodeConvert 编码转换仓位交易
 func (c *BaseWeb3Client) encodeConvert(negRiskMarketID common.Hash, indexSet *big.Int, amount *big.Int) ([]byte, error) {
 	return NegRiskAdapterABI.Pack("convertPositions", negRiskMarketID, indexSet, amount)
+}
+
+func (c *BaseWeb3Client) encodeCollateralOnrampWrap(asset common.Address, to common.Address, amount *big.Int) ([]byte, error) {
+	return CollateralOnrampABI.Pack("wrap", asset, to, amount)
+}
+
+func (c *BaseWeb3Client) redeemCollateralAddress() common.Address {
+	if c.chainID == 137 {
+		return USDCeAddress
+	}
+	return c.USDCAddress
 }
 
 // encodeProxy 编码代理交易
