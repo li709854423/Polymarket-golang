@@ -83,35 +83,16 @@ func (ob *OrderBuilder) GetOrderAmounts(side string, size, price float64, roundC
 
 // GetMarketOrderAmounts 获取市价订单金额
 // 精度要求（来自 Polymarket API）：
-// - BUY 订单：maker amount (USDC) 最多 4 位小数，taker amount (代币) 最多 2 位小数
+// - BUY 订单：maker amount (USDC) 最多 2 位小数，taker amount (代币) 最多 4 位小数
 // - SELL 订单：maker amount (代币) 最多 2 位小数，taker amount (USDC) 最多 4 位小数
 func (ob *OrderBuilder) GetMarketOrderAmounts(side string, amount, price float64, roundConfig RoundConfig) (model.Side, *big.Int, *big.Int, error) {
 	rawPrice := RoundNormal(price, roundConfig.Price)
 
 	if side == "BUY" {
-		// BUY: maker = USDC (最多 Amount 位小数), taker = 代币数量 (最多 Size 位小数)
-		// 1. 先计算 taker amount (代币数量)
+		// BUY: maker = USDC (最多 Size 位小数), taker = 代币数量 (最多 Amount 位小数)
 		rawMakerAmt := RoundDown(amount, roundConfig.Size)
 		rawTakerAmt := rawMakerAmt / rawPrice
-
-		// 2. taker amount（代币数量）必须舍入到 Size 位小数（通常是 2 位）
-		if DecimalPlaces(rawTakerAmt) > roundConfig.Size {
-			rawTakerAmt = RoundDown(rawTakerAmt, roundConfig.Size)
-		}
-
-		// 3. 关键修复：反向重新计算 maker amount，确保 maker = taker * price
-		// 这样可以保证 API 验证通过
-		rawMakerAmt = rawTakerAmt * rawPrice
-
-		// 4. 再次检查 maker amount 的精度
-		if DecimalPlaces(rawMakerAmt) > roundConfig.Amount {
-			// 尝试向上舍入一点点，看是否能解决精度问题
-			rawMakerAmt = RoundUp(rawMakerAmt, roundConfig.Amount+4)
-			if DecimalPlaces(rawMakerAmt) > roundConfig.Amount {
-				// 如果还是不行，强制截断
-				rawMakerAmt = RoundDown(rawMakerAmt, roundConfig.Amount)
-			}
-		}
+		rawTakerAmt = RoundDown(rawTakerAmt, roundConfig.Amount)
 
 		makerAmount := big.NewInt(ToTokenDecimals(rawMakerAmt))
 		takerAmount := big.NewInt(ToTokenDecimals(rawTakerAmt))
@@ -121,20 +102,7 @@ func (ob *OrderBuilder) GetMarketOrderAmounts(side string, amount, price float64
 		// SELL: maker = 代币数量 (最多 Size 位小数), taker = USDC (最多 Amount 位小数)
 		rawMakerAmt := RoundDown(amount, roundConfig.Size)
 		rawTakerAmt := rawMakerAmt * rawPrice
-
-		// 1. taker amount（USDC）舍入到 Amount 位小数
-		if DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
-			rawTakerAmt = RoundUp(rawTakerAmt, roundConfig.Amount+4)
-			if DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
-				rawTakerAmt = RoundDown(rawTakerAmt, roundConfig.Amount)
-			}
-		}
-
-		// 2. 关键修复：反向重算 maker amount，确保 maker * price == taker
-		rawMakerAmt = rawTakerAmt / rawPrice
-		if DecimalPlaces(rawMakerAmt) > roundConfig.Size {
-			rawMakerAmt = RoundDown(rawMakerAmt, roundConfig.Size)
-		}
+		rawTakerAmt = RoundDown(rawTakerAmt, roundConfig.Amount)
 
 		makerAmount := big.NewInt(ToTokenDecimals(rawMakerAmt))
 		takerAmount := big.NewInt(ToTokenDecimals(rawTakerAmt))
