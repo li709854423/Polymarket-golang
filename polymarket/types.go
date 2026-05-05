@@ -1,6 +1,6 @@
 package polymarket
 
-import obuilder "github.com/wimgithub/Polymarket-golang/polymarket/order_builder"
+import obuilder "github.com/li709854423/Polymarket-golang/polymarket/order_builder"
 
 // ApiCreds API凭证
 type ApiCreds struct {

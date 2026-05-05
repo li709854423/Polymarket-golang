@@ -10,8 +10,8 @@ import (
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/wimgithub/Polymarket-golang/polymarket"
-	"github.com/wimgithub/Polymarket-golang/polymarket/web3"
+	"github.com/li709854423/Polymarket-golang/polymarket"
+	"github.com/li709854423/Polymarket-golang/polymarket/web3"
 )
 
 // Position API 返回的头寸结构

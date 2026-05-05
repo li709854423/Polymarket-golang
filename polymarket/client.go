@@ -6,8 +6,8 @@ import (
 	"strings"
 	"sync"
 
-	obuilder "github.com/wimgithub/Polymarket-golang/polymarket/order_builder"
-	"github.com/wimgithub/Polymarket-golang/polymarket/rfq"
+	obuilder "github.com/li709854423/Polymarket-golang/polymarket/order_builder"
+	"github.com/li709854423/Polymarket-golang/polymarket/rfq"
 )
 
 // ClobClient CLOB客户端

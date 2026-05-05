@@ -1,4 +1,4 @@
-module github.com/wimgithub/Polymarket-golang
+module github.com/li709854423/Polymarket-golang
 
 go 1.24.0
 

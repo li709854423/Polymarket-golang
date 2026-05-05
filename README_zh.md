@@ -21,7 +21,7 @@ Follow at X:  @netu5er
 ## 安装
 
 ```bash
-go get github.com/wimgithub/Polymarket-golang
+go get github.com/li709854423/Polymarket-golang
 ```
 
 ## 快速开始
@@ -33,7 +33,7 @@ package main
 
 import (
     "fmt"
-    "github.com/wimgithub/Polymarket-golang/polymarket"
+    "github.com/li709854423/Polymarket-golang/polymarket"
 )
 
 func main() {
@@ -248,7 +248,7 @@ SDK 包含两个 Web3 客户端用于链上操作：
 ### PolymarketWeb3Client（支付 Gas）
 
 ```go
-import "github.com/wimgithub/Polymarket-golang/polymarket/web3"
+import "github.com/li709854423/Polymarket-golang/polymarket/web3"
 
 // 创建 Web3 客户端（需要支付 gas）
 client, err := web3.NewPolymarketWeb3Client(

@@ -5,8 +5,8 @@ import (
 	"math/big"
 	"strconv"
 
+	obuilder "github.com/li709854423/Polymarket-golang/polymarket/order_builder"
 	"github.com/polymarket/go-order-utils/pkg/model"
-	obuilder "github.com/wimgithub/Polymarket-golang/polymarket/order_builder"
 )
 
 // ResolveTickSize 解析tick size
