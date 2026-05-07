@@ -158,20 +158,20 @@ func (c *ClobClient) CreateMarketOrder(orderArgs *MarketOrderArgs, options *Part
 		return nil, err
 	}
 
-	// 如果价格未设置或为0，计算市价
-	if orderArgs.Price <= 0 {
-		price, err := c.CalculateMarketPrice(orderArgs.TokenID, orderArgs.Side, orderArgs.Amount, orderArgs.OrderType)
-		if err != nil {
-			return nil, err
-		}
-		orderArgs.Price = price
-	}
+	// // 如果价格未设置或为0，计算市价
+	// if orderArgs.Price <= 0 {
+	// 	price, err := c.CalculateMarketPrice(orderArgs.TokenID, orderArgs.Side, orderArgs.Amount, orderArgs.OrderType)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	orderArgs.Price = price
+	// }
 
-	// 验证价格
-	if !PriceValid(orderArgs.Price, tickSize) {
-		tickSizeFloat, _ := strconv.ParseFloat(string(tickSize), 64)
-		return nil, fmt.Errorf("price (%.6f), min: %s - max: %.6f", orderArgs.Price, tickSize, 1.0-tickSizeFloat)
-	}
+	// // 验证价格
+	// if !PriceValid(orderArgs.Price, tickSize) {
+	// 	tickSizeFloat, _ := strconv.ParseFloat(string(tickSize), 64)
+	// 	return nil, fmt.Errorf("price (%.6f), min: %s - max: %.6f", orderArgs.Price, tickSize, 1.0-tickSizeFloat)
+	// }
 
 	// 解析neg risk
 	negRisk := false
@@ -194,7 +194,6 @@ func (c *ClobClient) CreateMarketOrder(orderArgs *MarketOrderArgs, options *Part
 	side, makerAmount, takerAmount, err := c.builder.GetMarketOrderAmounts(
 		orderArgs.Side,
 		orderArgs.Amount,
-		orderArgs.Price,
 		roundConfig,
 	)
 	if err != nil {

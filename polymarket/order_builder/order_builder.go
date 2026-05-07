@@ -85,29 +85,24 @@ func (ob *OrderBuilder) GetOrderAmounts(side string, size, price float64, roundC
 // 精度要求（来自 Polymarket API）：
 // - BUY 订单：maker amount (USDC) 最多 2 位小数，taker amount (代币) 最多 4 位小数
 // - SELL 订单：maker amount (代币) 最多 2 位小数，taker amount (USDC) 最多 4 位小数
-func (ob *OrderBuilder) GetMarketOrderAmounts(side string, amount, price float64, roundConfig RoundConfig) (model.Side, *big.Int, *big.Int, error) {
-	rawPrice := RoundNormal(price, roundConfig.Price)
+func (ob *OrderBuilder) GetMarketOrderAmounts(side string, amount float64, roundConfig RoundConfig) (model.Side, *big.Int, *big.Int, error) {
 
 	if side == "BUY" {
 		// BUY: maker = USDC (最多 Size 位小数), taker = 代币数量 (最多 Amount 位小数)
 		rawMakerAmt := RoundDown(amount, roundConfig.Size)
-		rawTakerAmt := rawMakerAmt / rawPrice
-		rawTakerAmt = RoundDown(rawTakerAmt, roundConfig.Amount)
 
 		makerAmount := big.NewInt(ToTokenDecimals(rawMakerAmt))
-		takerAmount := big.NewInt(ToTokenDecimals(rawTakerAmt))
+		// takerAmount := big.NewInt(ToTokenDecimals(rawTakerAmt))
 
-		return model.BUY, makerAmount, takerAmount, nil
+		return model.BUY, makerAmount,  big.NewInt(0), nil
 	} else if side == "SELL" {
 		// SELL: maker = 代币数量 (最多 Size 位小数), taker = USDC (最多 Amount 位小数)
 		rawMakerAmt := RoundDown(amount, roundConfig.Size)
-		rawTakerAmt := rawMakerAmt * rawPrice
-		rawTakerAmt = RoundDown(rawTakerAmt, roundConfig.Amount)
 
 		makerAmount := big.NewInt(ToTokenDecimals(rawMakerAmt))
-		takerAmount := big.NewInt(ToTokenDecimals(rawTakerAmt))
+		// takerAmount := big.NewInt(ToTokenDecimals(rawTakerAmt))
 
-		return model.SELL, makerAmount, takerAmount, nil
+		return model.SELL, makerAmount, big.NewInt(0), nil
 	}
 
 	return 0, nil, nil, fmt.Errorf("order_args.side must be 'BUY' or 'SELL'")
