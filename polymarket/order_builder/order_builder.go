@@ -92,9 +92,8 @@ func (ob *OrderBuilder) GetMarketOrderAmounts(side string, amount float64, round
 		rawMakerAmt := RoundDown(amount, roundConfig.Size)
 
 		makerAmount := big.NewInt(ToTokenDecimals(rawMakerAmt))
-		// takerAmount := big.NewInt(ToTokenDecimals(rawTakerAmt))
 
-		return model.BUY, makerAmount,  big.NewInt(0), nil
+		return model.BUY, makerAmount, big.NewInt(1), nil
 	} else if side == "SELL" {
 		// SELL: maker = 代币数量 (最多 Size 位小数), taker = USDC (最多 Amount 位小数)
 		rawMakerAmt := RoundDown(amount, roundConfig.Size)
@@ -102,7 +101,7 @@ func (ob *OrderBuilder) GetMarketOrderAmounts(side string, amount float64, round
 		makerAmount := big.NewInt(ToTokenDecimals(rawMakerAmt))
 		// takerAmount := big.NewInt(ToTokenDecimals(rawTakerAmt))
 
-		return model.SELL, makerAmount, big.NewInt(0), nil
+		return model.SELL, makerAmount, big.NewInt(1), nil
 	}
 
 	return 0, nil, nil, fmt.Errorf("order_args.side must be 'BUY' or 'SELL'")
